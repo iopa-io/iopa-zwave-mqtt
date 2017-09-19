@@ -1,0 +1,17 @@
+{
+  "name": "iopa-zwave-mqtt",
+  "version": "0.8.0",
+  "description": "ZWave to MQTT Server Bridge",
+  "main": "src/index",
+  "scripts": {
+    "build": "node build",
+    "start": "node server",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "IOPA",
+  "license": "Apache-2.0",
+  "repository": "iopa-io/iopa-zwave-mqtt",
+  "dependencies": {
+    "serialport": "^4.0.0"
+  }
+}
