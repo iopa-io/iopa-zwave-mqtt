@@ -71,6 +71,9 @@ function ZwaveLogger(app) {
 }
 
 ZwaveLogger.prototype.invoke = function (context, next) {
+
+    if (context[IOPA.Scheme] !== "zwave:") return next();
+
     var data = context[ZWAVE.RawPayload];
 
     if (data.length < 5)
@@ -139,6 +142,8 @@ const ACK1 = new Buffer([ZWAVE.SERIAL.SerialFrameType.ACK]);
 // PUBLIC METHODS
 
 ZwaveTransportFlowControl.prototype.invoke = function (context, next) {
+
+    if (context[IOPA.Scheme] !== "zwave:") return next();
 
     var response = context[ZWAVE.RawPayload];
 

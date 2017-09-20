@@ -17,11 +17,10 @@
 
 const util = require('util'),
     EventEmitter = require('events').EventEmitter,
-    ZWAVE = require('./zwave-constants'),
+    ZWAVE = require('./util/zwave-constants'),
     SERVER = { Capabilities: "server.Capabilities", Server: "server.Server" };
 
-const mqtt = require('mqtt'),
-    util = require('util');
+const mqtt = require('mqtt');
 
 const rejectEvents = {
     'reconnect': 'info',
@@ -47,108 +46,35 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
  * @constructor
  * @public
  */
-function ZwaveMQTTMiddleware(app) {
+function ZwaveMqttMiddleware(app) {
     _classCallCheck(this, ZwaveTransportMiddleware);
 
     if (!app.properties[SERVER.Capabilities][ZWAVE.Capabilities][ZWAVE.Version])
-        throw new Error("ZwaveMQTTMiddleware requires embedded ZwaveServer");
+        throw new Error("ZwaveMqttMiddleware requires embedded ZwaveServer");
 }
 
-module.exports = ZwaveMQTTMiddleware;
+module.exports = ZwaveMqttMiddleware;
 
-ZwaveMQTTMiddleware._mqttInit = function(options) {
-    
-        var config = options.config;
-    
-        config.mqtt.options.will = {
-            topic: config.root + "/" + options.locationid + "/" + options.platformid + "/" + "offline",
-            payload: 'connection closed abnormally',
-            qos: 0,
-            retain: false
-        };
-    
-        var client = mqtt.connect(config.mqtt.uri, config.mqtt.options)
-    
-        // MQTT Connection
-        client.on('connect', function () {
-            _mqttLog("[connected to broker]", 'log');
-            client.subscribe(config.root + "/" + options.locationid + "/" + options.platformid + "/+/+/+");
-        });
-    
-        // On message received on node	
-        client.on('message', function (topic, message) {
-            var topics = topic.split('/');
-            var command = JSON.parse(message.toString());
-            _mqttLog("[command received]", 'log', util.inspect({ driver: topics[3], home: topics[4], node: topics[5] }), util.inspect(command));
-            invoke({ [IOPA.Path]: topic, [IOPA.Body]: message }, function(){ return Promise.resolve(true); });
-        });
-    
-        for (var r in rejectEvents) {
-            if (rejectEvents.hasOwnProperty(r)) {
-                var lg = r;
-                var logEvent = rejectEvents[r];
-                client.on(r, function (arguments) {
-                    _mqttLog(lg, logEvent, arguments);
-                });
-            }
+ZwaveMqttMiddleware.prototype.invoke = function (context, next) {
+
+    if (context[IOPA.Scheme] === "zwave:" && context[SERVER.Capabilities][MQTT.Capabilities] && context[SERVER.Capabilities][MQTT.Capabilities][SERVER.Server]) {
+
+        context[MQTT.Body] = context[ZWAVE.RawPayload];
+        context[MQTT.Topic] = context[IOPA.Path];
+        return context[SERVER.Capabilities][MQTT.Capabilities][SERVER.Server].send(topic, body);
+
+    } else if (context[IOPA.Scheme] === "mqtt:") {
+
+        var topic = context[MQTT.Body];
+        if (topic in context[SERVER.Capabilities][ZWAVE.Capabilities][SERVER.Server]) {
+            context[ZWAVE.RawPayload] = context[MQTT.Body]
+            return context[SERVER.Capabilities][ZWAVE.Capabilities][SERVER.Server][topic].send(context);
         }
-    
-        return {
-            "publish": function (topic, payload) { client.publish(topic, payload) },
-            "onmessage": function (_onmessage) { invoke = _onmessage; },
-            "end": function (cb) {
-                var topic = config.root + "/" + options.locationid + "/" + options.platformid + "/" + "offline";
-                var payload = 'connection closed';
-    
-                client.publish(topic, payload);
-                client.end(cb);
-            }
-        };
-    };
-    
-    function _mqttLog(event, logLevel, ...args) {
-        var args = args.filter(function (n) { return n != undefined });
-    
-        if (args.length > 0) {
-            console[logLevel]('[MQTT] ' + event + ' ' + args.join(', '));
-        } else {
-            console[logLevel]('[MQTT] ' + event);
-        }
-    
-    }
 
-ZwaveMQTTMiddleware.prototype.invoke = function (context, next) {
-    var response = context[ZWAVE.RawPayload];
+        return next();
 
+    } else
 
-    context[ZWAVE.FrameType] = response[0];
-    context[ZWAVE.Length] = response[1];
-    context[ZWAVE.MessageType] = response[2];
-    context[ZWAVE.SerialFunctionClass] = response[3];
-    context[ZWAVE.SerialPayload] = response.slice(4, response[1] + 1);
-
-    return Promise.resolve(null);
-}
-
-ZwaveMQTTMiddleware.prototype.send = function (server, next, context) {
-
-    if (typeof context !== 'object' || !(ZWAVE.SerialFunctionClass in context))
-        return next(context);
-
-    var rawpayload = BufferStream.alloc("Serial Framer Send");
-    rawpayload.writeARRAY([
-        ZWAVE.SERIAL.SerialFrameType.SOF,
-        context[ZWAVE.SerialPayload].length + 3,
-        ZWAVE.SERIAL.SerialMessageType.Request,
-        context[ZWAVE.SerialFunctionClass],
-        ...context[ZWAVE.SerialPayload], 0x00])
-    rawpayload = rawpayload.asBuffer();
-
-    if (rawpayload.length > 1)
-        rawpayload[rawpayload.length - 1] = ZWAVE.SERIAL.generateChecksum(rawpayload);
-
-    context[ZWAVE.RawPayload] = rawpayload;
-
-    return next(context);
+        return next();
 
 }

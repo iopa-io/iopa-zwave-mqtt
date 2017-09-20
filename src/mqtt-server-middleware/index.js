@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
-module.exports.ZwaveServer = require('./zwave-server-middleware').ZwaveServer;
-module.exports.ZwaveMqtt = require('./zwave-server-middleware').ZwaveMqtt;
-module.exports.MqttServer = require('./mqtt-server-middleware').MqttServer;
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+const
+  MqttTransportServer = require('./mqtt-transport-server');
+
+function MqttServer(app) {
+  app.use("mqtt:", MqttTransportServer);
+}
+
+module.exports.MqttServer = MqttServer;

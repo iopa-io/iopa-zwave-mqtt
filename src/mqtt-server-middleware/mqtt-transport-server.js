@@ -18,7 +18,8 @@
 const util = require('util'),
     IOPA = { Scheme: "iopa.Scheme", Protocol: "iopa.Protocol" },
     MQTT = { Body: "mqtt.Body", Topic: "mqtt.Topic", Capabilities: "mqtt.Capabilities", Version: "mqtt.Version" },
-    SERVER = { Capabilities: "server.Capabilities", Server: "server.Server" };
+    SERVER = { Capabilities: "server.Capabilities", Server: "server.Server" },
+    mqtt = require('mqtt');
 
 const rejectEvents = {
     'reconnect': 'info',
@@ -65,28 +66,42 @@ module.exports = MqttTransportServer;
 
 // PUBLIC METHODS, AUTOMATICALLY HOOKED BY AUTO GENERATED createServerForServers (see IOPA AppBuilder)
 
-MqttTransportServer.prototype.connect = function (server, options) {
+MqttTransportServer.prototype.connect = function (server, url, options) {
 
-    server.url = port;
-    server.options = options || {};
+    options = options || {};
 
-    var config = options.config;
+    if ((typeof url !== 'string') && !(url instanceof String)) {
+        url = options.url || "mqtt:localhost";
+    }
 
-    config.mqtt.options.will = {
+    options.will = options.will || {
         topic: config.root + "/" + options.locationid + "/" + options.platformid + "/" + "offline",
         payload: 'connection closed abnormally',
         qos: 0,
         retain: false
     };
 
-    server._rawstream = mqtt.connect(config.mqtt.uri, config.mqtt.options);
+    server.url = url;
+    server.options = options;
+
+    server._rawstream = mqtt.connect(url, options);
+
+    server.subscribe = function (topic) {
+        return new Promise(function (resolve, reject) {
+            server._rawstream.subscribe(topic, null, resolve);
+        });
+    };
+
+    this.app.properties[SERVER.Capabilities][MQTT.Capabilities][SERVER.Server] = server;
 
     return new Promise(function (resolve, reject) {
 
         server._rawstream.on('connect', function () {
-            _mqttLog("[connected to broker]", 'log');
             server._rawstream.subscribe(config.root + "/" + options.locationid + "/" + options.platformid + "/+/+/+");
             server.isOpen = true;
+
+            if (options.topics) server.subscribe(options.topics);
+
             resolve(server);
         });
 
@@ -94,25 +109,23 @@ MqttTransportServer.prototype.connect = function (server, options) {
 
         for (var r in rejectEvents) {
             if (rejectEvents.hasOwnProperty(r)) {
-                var lg = r;
-                var logEvent = rejectEvents[r];
-                server._rawstream.on(r, function (arguments) {
-                    _mqttLog(lg, logEvent, arguments);
+                server._rawstream.on(r, function (args) {
+                    // TO DO HANDLE REJECTION
                 });
             }
         }
     });
 };
 
-ZwaveTransportServer.prototype.send = function (server, next, context) {
+MqttTransportServer.prototype.send = function (server, next, context) {
     if (!server.isOpen)
         throw new Error("server must be opened with listen first");
 
-    var message = context[MQTT.Body];
+    var body = context[MQTT.Body];
     var topic = context[MQTT.Topic];
 
     var result = new Promise(function (resolve, reject) {
-        server._rawstream.publish(topic, payload, resolve);
+        server._rawstream.publish(topic, body, resolve);
     });
 
     if ('dispose' in context) context.dispose();
@@ -129,7 +142,7 @@ ZwaveTransportServer.prototype.send = function (server, next, context) {
     return result;
 }
 
-ZwaveTransportServer.prototype.close = function (server) {
+MqttTransportServer.prototype.close = function (server) {
     server.isOpen = false;
     return new Promise(function (resolve, reject) {
 
@@ -147,11 +160,7 @@ ZwaveTransportServer.prototype.close = function (server) {
 }
 
 // PRIVATE METHODS
-
-ZwaveTransportServer.prototype.onMessage_ = function (server, topic, message) {
-    var topics = topic.split('/');
-    _mqttLog("[command received]", 'log', util.inspect({ driver: topics[3], home: topics[4], node: topics[5] }));
-
+MqttTransportServer.prototype.onMessage_ = function (server, topic, message) {
     var context = this.app.createContext();
     context[MQTT.Body] = message;
     context[MQTT.Topic] = topic;
@@ -159,16 +168,4 @@ ZwaveTransportServer.prototype.onMessage_ = function (server, topic, message) {
     context[IOPA.Protocol] = "MQTT/3.1.1";
     context[SERVER.Capabilities][SERVER.Server] = server;
     context.using(this.app.invoke.bind(this.app));
-
-}
-
-function _mqttLog(event, logLevel, ...args) {
-    var args = args.filter(function (n) { return n != undefined });
-
-    if (args.length > 0) {
-        console[logLevel]('[MQTT] ' + event + ' ' + args.join(', '));
-    } else {
-        console[logLevel]('[MQTT] ' + event);
-    }
-
 }

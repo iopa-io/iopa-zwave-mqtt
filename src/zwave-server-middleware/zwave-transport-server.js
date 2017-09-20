@@ -18,7 +18,7 @@
 const util = require('util'),
     SerialPort = require('serialport'),
     ZWAVE = require('./util/zwave-constants'),
-    IOPA = { Scheme: "iopa.Scheme", Protocol: "iopa.Protocol" },  
+    IOPA = { Scheme: "iopa.Scheme", Protocol: "iopa.Protocol", Path: "iopa.Path" },
     SERVER = { Capabilities: "server.Capabilities", Server: "server.Server" },
     ZwaveStreamParser = require('./zwave-transport-stream-parser');
 
@@ -74,6 +74,11 @@ ZwaveTransportServer.prototype.listen = function (server, port, options) {
     server._rawstream.pipe(parser);
 
     server.stream = server._rawstream;
+    server.id = "zwave" + "/" + options.PlatformId + "/" + options.LocationId;
+
+    this.app.properties[SERVER.Capabilities][ZWAVE.Capabilities][SERVER.Server] = this.app.properties[SERVER.Capabilities][ZWAVE.Capabilities][SERVER.Server]
+        || {};
+    this.app.properties[SERVER.Capabilities][ZWAVE.Capabilities][SERVER.Server][server.id] = server;
 
     parser.on("data", this.onData_.bind(this, server));
 
@@ -103,7 +108,7 @@ ZwaveTransportServer.prototype.send = function (server, next, context) {
             }
         };
     }
-    
+
     return result;
 
 }
@@ -126,10 +131,10 @@ ZwaveTransportServer.prototype.onData_ = function (server, data) {
     context[SERVER.Capabilities][SERVER.Server] = server;
     context[IOPA.Scheme] = "zwave:";
     context[IOPA.Protocol] = "ZWAVE/5.0";
-    context[SERVER.Capabilities][SERVER.Server] = server;
+    context[IOPA.Path] = "out/" + server.id;
 
     context.using(this.app.invoke.bind(this.app));
-    
+
 }
 
 ZwaveTransportServer.prototype.write_ = function (server, data) {

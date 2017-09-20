@@ -12,6 +12,7 @@
   "license": "Apache-2.0",
   "repository": "iopa-io/iopa-zwave-mqtt",
   "dependencies": {
+    "mqtt": "^2.13.0",
     "serialport": "^4.0.0"
   }
 }

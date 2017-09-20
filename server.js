@@ -1,24 +1,22 @@
 const util = require('util'),
   EventEmitter = require('events').EventEmitter,
   SerialPort = require('serialport'),
-  ZwaveTest = require('./src/index').SERVER,
-  platformid = "urn:io.resin:" + (process.env.RESIN_DEVICE_UUID || "localhost"),
-  locationid = process.env.RESIN_LOCATION_ID || "home",
+  PlatformId = "urn:io.resin:" + (process.env.RESIN_DEVICE_UUID || "localhost"),
+  LocationId = process.env.RESIN_LOCATION_ID || "home",
   IopaApp = require('./src/iopa-slim').App,
-  IopaDevice = require('./src/iopa-device'),
-  ZwaveBinding = require('./src').Server,
-  ZWAVE = ZwaveBinding.ZWAVE,
+  ZwaveServer = require('./src').ZwaveServer,
+  MqttServer = require('./src').MqttServer;
+  ZwaveMqttBridge = require('./src').ZwaveMqtt;
 
-  WD100 = require('./drivers/ZWaveProducts/WD100-InWallDimmerSwitch/device');
-  
+var zwave, mqtt;
+
 process.removeAllListeners('SIGINT');
 
 process.on('SIGINT', function () {
   console.log('disconnecting...');
-  zwave.disconnect();
+  zwave.close();
+  mqtt.close();
 });
-
-// RUN MAIN
 
 (function main() {
 
@@ -27,16 +25,18 @@ process.on('SIGINT', function () {
       console.log("Connecting to " + port.comName)
 
       var app = new IopaApp();
-      app.use(ZwaveBinding);
-      app.use(IopaDevice, {drivers:  __dirname + '/drivers'});
+      app.use(ZwaveServer);
+      app.use(MqttServer);
+      app.use(ZwaveMqttBridge);
+      
+      zwave = app.createServer("zwave:");
+      mqtt = app.createServer("mqtt:");
 
-      var options = { locationid: locationid, platformid: platformid };
-      var server = app.createServer("zwave:", options);
-
-      server.listen(port.comName)
+      mqtt.connect({ LocationId: LocationId, PlatformId: PlatformId })
         .then(() => {
-          console.log(util.inspect(server.db, false, 100));
-
+          zwave.listen(port.comName, { LocationId: LocationId, PlatformId: PlatformId })
+        }).then(() => {
+          mqtt.subscribe(zwave.id);
         });
 
     } else {
