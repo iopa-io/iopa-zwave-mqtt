@@ -18,7 +18,8 @@
 const util = require('util'),
     Transform = require('stream').Transform,
     ZWAVE = require('./util/zwave-constants'),
-    BufferStream = require('./util/bufferstream')
+    BufferStreamFactory = require('./util/bufferstream').BufferStreamFactory,
+    BufferStream = new BufferStreamFactory()
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 

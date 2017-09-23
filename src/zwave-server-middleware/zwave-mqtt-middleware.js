@@ -47,7 +47,7 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
  * @public
  */
 function ZwaveMqttMiddleware(app) {
-    _classCallCheck(this, ZwaveTransportMiddleware);
+    _classCallCheck(this, ZwaveMqttMiddleware);
 
     if (!app.properties[SERVER.Capabilities][ZWAVE.Capabilities][ZWAVE.Version])
         throw new Error("ZwaveMqttMiddleware requires embedded ZwaveServer");

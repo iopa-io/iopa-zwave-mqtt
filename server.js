@@ -1,7 +1,7 @@
 const util = require('util'),
   EventEmitter = require('events').EventEmitter,
   SerialPort = require('serialport'),
-  PlatformId = "urn:io.resin:" + (process.env.RESIN_DEVICE_UUID || "localhost"),
+  PlatformId = process.env.RESIN_DEVICE_UUID ? "urn:io.resin:" + process.env.RESIN_DEVICE_UUID : "controller1",
   LocationId = process.env.RESIN_LOCATION_ID || "home",
   IopaApp = require('./src/iopa-slim').App,
   ZwaveServer = require('./src').ZwaveServer,
@@ -32,7 +32,7 @@ process.on('SIGINT', function () {
       zwave = app.createServer("zwave:");
       mqtt = app.createServer("mqtt:");
 
-      mqtt.connect({ LocationId: LocationId, PlatformId: PlatformId })
+      mqtt.connect({ root: "", LocationId: LocationId, PlatformId: PlatformId })
         .then(() => {
           zwave.listen(port.comName, { LocationId: LocationId, PlatformId: PlatformId })
         }).then(() => {

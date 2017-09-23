@@ -69,13 +69,14 @@ module.exports = MqttTransportServer;
 MqttTransportServer.prototype.connect = function (server, url, options) {
 
     options = options || {};
-
+    
     if ((typeof url !== 'string') && !(url instanceof String)) {
+        options = url;
         url = options.url || "mqtt:localhost";
-    }
+     }
 
     options.will = options.will || {
-        topic: config.root + "/" + options.locationid + "/" + options.platformid + "/" + "offline",
+        topic: options.root + "/" + options.LocationId + "/" + options.PlatformId + "/" + "offline",
         payload: 'connection closed abnormally',
         qos: 0,
         retain: false
@@ -93,11 +94,19 @@ MqttTransportServer.prototype.connect = function (server, url, options) {
     };
 
     this.app.properties[SERVER.Capabilities][MQTT.Capabilities][SERVER.Server] = server;
+    var self = this;
 
     return new Promise(function (resolve, reject) {
 
         server._rawstream.on('connect', function () {
-            server._rawstream.subscribe(config.root + "/" + options.locationid + "/" + options.platformid + "/+/+/+");
+
+            var topic = options.root + "/" + options.LocationId + "/" + options.PlatformId + "/" + "online";
+            var payload = 'connection open';
+            if (server._rawstream) {
+                server._rawstream.publish(topic, payload);
+            }
+
+            server._rawstream.subscribe(options.root + "/" + options.LocationId + "/" + options.PlatformId + "/+/+/+");
             server.isOpen = true;
 
             if (options.topics) server.subscribe(options.topics);
@@ -105,7 +114,7 @@ MqttTransportServer.prototype.connect = function (server, url, options) {
             resolve(server);
         });
 
-        server._rawstream.on('message', this.onMessage_.bind(this, server));
+        server._rawstream.on('message', self.onMessage_.bind(this, server));
 
         for (var r in rejectEvents) {
             if (rejectEvents.hasOwnProperty(r)) {
@@ -146,7 +155,9 @@ MqttTransportServer.prototype.close = function (server) {
     server.isOpen = false;
     return new Promise(function (resolve, reject) {
 
-        var topic = config.root + "/" + options.locationid + "/" + options.platformid + "/" + "offline";
+        const options = server.options;
+
+        var topic = options.root + "/" + options.LocationId + "/" + options.PlatformId + "/" + "offline";
         var payload = 'connection closed';
         if (server._rawstream) {
             server._rawstream.publish(topic, payload);
