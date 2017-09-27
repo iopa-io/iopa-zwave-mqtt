@@ -66,11 +66,15 @@ function _findZwavePort(callback) {
 }
 
 function _isZwavePort(port) {
-  return ((port.vendorId == '0x0658' &&
-    port.productId == '0x0200') ||  // Aeotech Z-Stick Gen-5
-    (port.vendorId == '0x0658' &&
-      port.productId == '0x0280') ||  // UZB1
-    (port.vendorId == '0x10c4' &&
-      port.productId == '0xea60'));   // Aeotech Z-Stick S2
+
+   const vendorId = parseInt("0" + port.vendorId, 16);
+  const productId = parseInt("0" + port.productId, 16);
+
+  return ((vendorId == 0x0658 &&
+    productId == 0x0200) ||  // Aeotech Z-Stick Gen-5
+    (vendorId == 0x0658 &&
+      productId == 0x0280) ||  // UZB1
+    (vendorId == 0x10c4 &&
+      productId == 0xea60));   // Aeotech Z-Stick S2
 }
 
